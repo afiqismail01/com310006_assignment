@@ -4,7 +4,7 @@ from embed_watermark_2 import embed_watermark
 from tampering_detector_4 import detect_tampering_by_coords
 
 carrier_image_path = 'carrier_image.png'
-watermark_path = 'watermark.png'
+watermark_path = 'watermark_1.png'
 output_path = 'watermarked_output.png'
 
 
