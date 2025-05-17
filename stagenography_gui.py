@@ -105,67 +105,71 @@ def load_watermark():
 
 
 def embed_watermark_gui():
-    global image, embed_locs, image_tk, embedded_image_tk
+    global image, embed_locs, embedded_image_tk
     if not carrier_path or not watermark_path:
         messagebox.showerror("Error", "Load both carrier and watermark images first.")
         return
 
-    index = simpledialog.askinteger("Keypoint Index", "Enter keypoint index (0-9):", minvalue=0, maxvalue=9)
-    if index is None:
-        return
-
     try:
-        image, loc = embed_watermark(image, keypoints, watermark_path, index)
         embed_locs.clear()
-        embed_locs.append(loc)
+        num_keypoints_to_use = len(keypoints)
+
+        for i in range(min(num_keypoints_to_use, len(keypoints))):
+            image, loc = embed_watermark(image, keypoints, watermark_path, i)
+            embed_locs.append(loc)
+
         cv2.imwrite("watermarked_output.png", image)
 
-        # Draw a visual marker on the embedded location
+        # Show image with markers on all embed locations
         vis_image = image.copy()
-        cv2.circle(vis_image, (loc[0], loc[1]), radius=6, color=(0, 255, 0), thickness=2)
+        for loc in embed_locs:
+            cv2.circle(vis_image, (loc[0], loc[1]), radius=6, color=(0, 255, 0), thickness=2)
         img_pil = Image.fromarray(cv2.cvtColor(vis_image, cv2.COLOR_BGR2RGB)).resize((300, 300))
         embedded_image_tk = ImageTk.PhotoImage(img_pil)
         embedded_image_label.config(image=embedded_image_tk)
 
-        embed_status_label.config(text="Watermark added")
+        embed_status_label.config(text=f"Watermark embedded at {len(embed_locs)} keypoints")
 
     except Exception as e:
         messagebox.showerror("Embedding Failed", str(e))
 
 
+
 def load_tampered_image():
     global tampered_image_path, tampered_image_tk, extracted_wm_tk
     tampered_image_path = filedialog.askopenfilename(title="Select Tampered Image")
-    if tampered_image_path:
-        tampered_img_cv = cv2.imread(tampered_image_path)
-        img_pil = Image.fromarray(cv2.cvtColor(tampered_img_cv, cv2.COLOR_BGR2RGB)).resize((300, 300))
+    if not tampered_image_path:
+        return
+
+    tampered_img_cv = cv2.imread(tampered_image_path)
+
+    vis_img = tampered_img_cv.copy()
+
+    if embed_locs:
+        ref_wm = cv2.imread(watermark_path, cv2.IMREAD_GRAYSCALE)
+
+        # Store status per location
+        tampered_points = detect_tampering_by_coords(tampered_img_cv, embed_locs, ref_wm)
+
+        # Visualize all locations
+        for i, (x, y) in enumerate(embed_locs):
+            x, y = int(x), int(y)
+            if 0 <= x < vis_img.shape[1] and 0 <= y < vis_img.shape[0]:
+                color = (0, 255, 0) if (i not in tampered_points) else (0, 0, 255)  # Green or Red
+                cv2.circle(vis_img, (x, y), radius=6, color=color, thickness=2)
+
+        # Resize and display tampered image
+        img_pil = Image.fromarray(cv2.cvtColor(vis_img, cv2.COLOR_BGR2RGB)).resize((300, 300))
         tampered_image_tk = ImageTk.PhotoImage(img_pil)
         tampered_image_label.config(image=tampered_image_tk)
 
-        # Attempt extraction and tamper detection
-        if embed_locs:
-            x, y = embed_locs[0]
-            # wm_array = extract_watermark_by_coords(tampered_img_cv, x, y)
-            # TEMP: test extraction from memory
-            wm_array = extract_watermark_by_coords(tampered_img_cv, x, y)
-            print("Extracted watermark bits:")
-            print(wm_array)
+        # Summary status
+        if not tampered_points:
+            check_status_label.config(text="✅ All watermarks intact.")
+        else:
+            check_status_label.config(text=f"⚠️ Tampering at {len(tampered_points)} of {len(embed_locs)} locations.")
 
-            binary_array = (wm_array > 0).astype(np.uint8)
-            wm_img = Image.fromarray((binary_array * 255).astype('uint8')).convert('L')
-            wm_img = wm_img.resize((100, 100), resample=Image.NEAREST)
-            extracted_wm_tk = ImageTk.PhotoImage(wm_img)
-            extracted_wm_label.config(image=extracted_wm_tk)
-
-            # Check if tampered
-            ref_wm = cv2.imread(watermark_path, cv2.IMREAD_GRAYSCALE)
-            result = detect_tampering_by_coords(tampered_img_cv, [(x, y)], ref_wm)
-            if not result:
-                check_status_label.config(text="✅ No tampering detected.")
-            else:
-                check_status_label.config(text="⚠️ Tampering detected at this region.")
-
-        print("Tampered image loaded:", tampered_image_path)
+        print("Tampered locations (indexes):", tampered_points)
 
 
 # ==== Button Callbacks ====
