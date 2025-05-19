@@ -10,6 +10,13 @@ def extract_watermark(watermarked_img, keypoints, keypoint_index):
         return None
 
     patch = watermarked_img[y-1:y+2, x-1:x+2]
+
+    # print(f"\nExtracted 3x3 region at ({x}, {y}):")
+    # for i in range(3):
+    #     for j in range(3):
+    #         b, g, r = patch[i, j]
+    #         print(f"({i},{j}) BGR: [{b}, {g}, {r}] | LSB: {b & 1}")
+
     extracted_bits = np.zeros((3, 3), dtype=np.uint8)
 
     for i in range(3):

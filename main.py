@@ -4,7 +4,6 @@ import numpy as np
 from SIFT_detector_1 import detect_sift_keypoints
 from embed_watermark_2 import embed_watermark
 from extract_watermark_3 import extract_watermark
-from tampering_detector_4 import tampering_detector
 
 carrier_image_path = 'carrier_image.png'
 watermark_path = 'watermark_1.png'
@@ -57,13 +56,5 @@ for idx in range(keypoint_range):
 print(f"matched_kp: {matched_count} / {keypoint_range}")
 print(f"target image consistency: { matched_count / keypoint_range * 100}")
 
-
-# matching_embedding_bits = tampering_detector(recovered_blocks, wm_bits.tolist())
-# print(f"{matching_embedding_bits} / {len(recovered_blocks)} blocks match the embedded watermark.")
-
-# if not tampered_blocks:
-#     print("✅ No tampering detected.")
-# else:
-#     print("⚠️ Tampering detected in watermark blocks:", tampered_blocks)
 
 
