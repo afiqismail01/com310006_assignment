@@ -6,8 +6,7 @@ import numpy as np
 from PIL import Image, ImageTk
 from SIFT_detector_1 import detect_sift_keypoints
 from embed_watermark_2 import embed_watermark
-from extract_watermark_3 import extract_watermark_by_coords
-from tampering_detector_4 import detect_tampering_by_coords
+from extract_watermark_3 import extract_watermark
 
 # Global state
 carrier_path = None
@@ -16,6 +15,7 @@ tampered_image_path = None
 keypoints = None
 image = None
 embed_locs = []
+min_spacing = 0
 image_tk = None
 wm_image_tks = []
 embedded_image_tk = None
@@ -59,6 +59,8 @@ carrier_btn.pack()
 
 main_image_label = tk.Label(main_frame)
 main_image_label.pack()
+carrier_kf_count_label = tk.Label(main_frame, text="")
+carrier_kf_count_label.pack()
 
 # ==== Watermark Frame Content ====
 load_wm_btn = tk.Button(wm_frame, text="Load Watermark", state='disabled')
@@ -85,13 +87,16 @@ load_tampered_btn = tk.Button(check_frame, text="Load Tampered Image", state='di
 load_tampered_btn.pack(pady=5)
 
 tampered_image_label = tk.Label(check_frame)
-tampered_image_label.pack(side=tk.LEFT, padx=20)
+tampered_image_label.pack()
 
 extracted_wm_label = tk.Label(check_frame)
-extracted_wm_label.pack(side=tk.LEFT, padx=20)
+extracted_wm_label.pack()
+
+tampered_kf_count_label = tk.Label(check_frame, text="")
+tampered_kf_count_label.pack()
 
 # ==== Authenticity Frame Content ====
-auth_result_label = tk.Label(auth_frame, text="Watermark Present: Unknown", font=("Arial", 12, "bold"))
+auth_result_label = tk.Label(auth_frame, text="Image Authenticator", font=("Arial", 12, "bold"))
 auth_result_label.pack(pady=5)
 
 integrity_label = tk.Label(auth_frame, text="Integrity: 0.0%", font=("Arial", 10))
@@ -112,8 +117,11 @@ def load_carrier():
         img_pil = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB)).resize((300, 300))
         image_tk = ImageTk.PhotoImage(img_pil)
         main_image_label.config(image=image_tk)
+        carrier_kf_count_label.config(text=f"SIFT found {len(keypoints)} keypoints")
         load_wm_btn.config(state='normal')
-        print("Carrier image loaded:", carrier_path)
+        print("## Step 1: Load Carrier Image")
+        print("Carrier image loaded: ", carrier_path)
+        print(f"Keypoints detected: {len(keypoints)}\n")
 
 
 def load_watermark():
@@ -122,18 +130,25 @@ def load_watermark():
         messagebox.showinfo("Limit Reached", "You can only load up to 3 watermark images.")
         return
 
-    path = filedialog.askopenfilename(title="Select Watermark Image")
-    if path:
-        watermark_paths.append(path)
-        img = Image.open(path)
+    wm_path = filedialog.askopenfilename(title="Select Watermark Image")
+    if wm_path:
+        watermark_paths.append(wm_path)
+        img = Image.open(wm_path)
         img_resized = img.resize((100, 100), resample=Image.NEAREST)
         tk_img = ImageTk.PhotoImage(img_resized)
         wm_image_tks.append(tk_img)
+
+        # change to binary
+        watermark = cv2.imread(wm_path, cv2.IMREAD_GRAYSCALE)
+        wm_bits = (watermark > 128).astype(np.uint8).tolist()
+
         wm_image_labels[len(watermark_paths)-1].config(image=tk_img)
 
         if len(watermark_paths) > 0:
             embed_btn.config(state='normal')
-        print(f"Watermark image {len(watermark_paths)} loaded:", path)
+        print("## Step 2: Load up to 3 Watermark Images")
+        print(f"Watermark image {len(watermark_paths)} loaded:", wm_path)
+        print(f"Watermark images loaded: {wm_bits}")
 
 
 
@@ -149,21 +164,23 @@ def filter_keypoints_by_spacing(keypoints, min_distance):
 
 
 def embed_watermark_gui():
-    global image, embed_locs, embedded_image_tk
+    global image, embed_locs, embedded_image_tk, min_spacing
     if not carrier_path or len(watermark_paths) == 0:
         messagebox.showerror("Error", "Load carrier and at least one watermark image.")
         return
 
+    print("\n## Step 3: Embed Watermarks to Carrier Image")
     try:
         embed_locs.clear()
-        min_spacing = simpledialog.askinteger("Spacing Filter", "Minimum spacing between keypoints (e.g., 20):", minvalue=1, initialvalue=20)
-        if not min_spacing:
+        min_distance = simpledialog.askinteger("Spacing Filter", "Minimum spacing between keypoints (e.g., 20):", minvalue=1, initialvalue=20)
+        if min_distance is None:
             return
+        min_spacing = min_distance
 
         filtered_keypoints = filter_keypoints_by_spacing(keypoints, min_spacing)
-        num_keypoints_to_use = len(filtered_keypoints)
+        print(f"total_keypoints: {len(keypoints)} | filtered_keypoints: {len(filtered_keypoints)}")
 
-        for i in range(num_keypoints_to_use):
+        for i in range(len(filtered_keypoints)):
             wm_path = watermark_paths[i % len(watermark_paths)]
             image, loc = embed_watermark(image, filtered_keypoints, wm_path, i)
             embed_locs.append(loc)
@@ -179,6 +196,7 @@ def embed_watermark_gui():
 
         embed_status_label.config(text=f"Watermarks embedded at {len(embed_locs)} filtered keypoints")
         load_tampered_btn.config(state='normal')
+        print(f"embedded_location: {embed_locs}")
 
     except Exception as e:
         messagebox.showerror("Embedding Failed", str(e))
@@ -186,96 +204,48 @@ def embed_watermark_gui():
 
 def load_tampered_image():
     global tampered_image_path, tampered_image_tk, extracted_wm_tk
-    tampered_image_path = filedialog.askopenfilename(title="Select Tampered Image")
+    print("\n## Step 4: Load up Test Image")
+    print("uploading test image...")
+    tampered_image_path = filedialog.askopenfilename(title="Select Test Image")
     if not tampered_image_path:
         return
 
-    tampered_img_cv = cv2.imread(tampered_image_path)
-    vis_img = tampered_img_cv.copy()
+    # 4.1 Re-apply SIFT detection
+    embedded_img, kp_embedded, desc_embedded = detect_sift_keypoints(tampered_image_path)
+    # filter keypoints spacing
+    filtered_keypoints = filter_keypoints_by_spacing(kp_embedded, min_spacing)
+    print(f"total_keypoints: {len(kp_embedded)} | filtered_keypoints: {len(filtered_keypoints)}")
 
-    if embed_locs and watermark_paths:
-        tampered_points = []
-        matched_count = 0
+    num_keypoints_to_use = len(filtered_keypoints)
+    tampered_kf_count_label.config(text=f"{min_spacing} SIFT found {len(kp_embedded)} keypoints.\nUse only {num_keypoints_to_use} keypoints")
 
-        for i, (x, y) in enumerate(embed_locs):
-            wm_path = watermark_paths[i % len(watermark_paths)]
-            ref_wm = cv2.imread(wm_path, cv2.IMREAD_GRAYSCALE)
-            point_status = detect_tampering_by_coords(tampered_img_cv, [(x, y)], ref_wm)
-            if point_status:
-                tampered_points.append((int(x), int(y)))
-            else:
-                matched_count += 1
-
-        for i, (x, y) in enumerate(embed_locs):
-            x, y = int(x), int(y)
-            if 0 <= x < vis_img.shape[1] and 0 <= y < vis_img.shape[0]:
-                color = (0, 0, 255) if i in tampered_points else (0, 255, 0)
-                cv2.circle(vis_img, (x, y), radius=6, color=color, thickness=2)
-
-        img_pil = Image.fromarray(cv2.cvtColor(vis_img, cv2.COLOR_BGR2RGB)).resize((300, 300))
-        tampered_image_tk = ImageTk.PhotoImage(img_pil)
-        tampered_image_label.config(image=tampered_image_tk)
-
-        total = len(embed_locs)
-        tampered_count = len(tampered_points)
-        matched_count = total - tampered_count
-
-        if tampered_count > 0:
-            coords_text = ", ".join(f"({x},{y})" for x, y in tampered_points[:10])
-            if len(tampered_points) > 10:
-                coords_text += "..."
-            tampered_coords_label.config(text=f"Tampered Coords: {coords_text}")
-        else:
-            tampered_coords_label.config(text="Tampered Coords: None")
-
-        # Update Verification Info
-        auth_result_label.config(text="Watermark Present: Yes" if matched_count > 0 else "No")
-        integrity_percentage = (matched_count / total) * 100 if total > 0 else 0
-        integrity_label.config(
-            text=f"Integrity: {integrity_percentage:.1f}%"
+    recovered_blocks = []
+    for idx in range(len(filtered_keypoints)):
+        block_bits = extract_watermark(
+            embedded_img, kp_embedded, keypoint_index=idx
         )
-        match_count_label.config(text=f"Keypoints Matched: {matched_count} / {total}")
+        recovered_blocks.append(block_bits.tolist())
 
-        if integrity_percentage >= 90:
-            integrity_label.config(fg="green")
-        elif integrity_percentage >= 50:
-            integrity_label.config(fg="orange")
+    vis_image = embedded_img.copy()
+    counter = 0
+    matched_kp_count = 0
+    for kp in filtered_keypoints:
+        x, y = int(kp.pt[0]), int(kp.pt[1])
+        # print(f"({x},{y}): {recovered_blocks[counter]}")
+        print(f"({x},{y})")
+        if recovered_blocks[counter] == [[1, 0, 1], [0, 1, 0], [1, 0, 1]]:
+            cv2.circle(vis_image, (x,y), radius=6, color=(0, 255, 0), thickness=2)
+            matched_kp_count += 1
         else:
-            integrity_label.config(fg="red")
+            cv2.circle(vis_image, (x,y), radius=6, color=(0, 0, 255), thickness=2)
+        counter += 1
 
-        print("Tampered locations (indexes):", tampered_points)
+    img_pil = Image.fromarray(cv2.cvtColor(vis_image, cv2.COLOR_BGR2RGB)).resize((300, 300))
+    tampered_image_tk = ImageTk.PhotoImage(img_pil)
+    tampered_image_label.config(image=tampered_image_tk)
+    match_count_label.config(text=f"Keypoints Matched: {matched_kp_count} / {len(filtered_keypoints)}")
+    integrity_label.config(text=f"Authenticity Level: { matched_kp_count / len(filtered_keypoints) * 100}% ")
 
-        if not tampered_image_path:
-            messagebox.showinfo("No Image", "Please load a tampered image first.")
-            return
-        result = verify_authenticity(tampered_image_path)
-        # auth_label.config(text=f"Watermark Present: {result}")
-
-def verify_authenticity(image_path):
-    try:
-        img_cv = cv2.imread(image_path)
-        detected = 0
-        required = 5  # number of successful detections needed to confirm authenticity
-
-        sift_img, kp, _ = detect_sift_keypoints(image_path)
-        filtered_kp = filter_keypoints_by_spacing(kp, min_distance=20)
-
-        for i in range(min(len(filtered_kp), 30)):
-            wm_path = watermark_paths[i % len(watermark_paths)]
-            ref_wm = cv2.imread(wm_path, cv2.IMREAD_GRAYSCALE)
-            if ref_wm is None:
-                continue
-            loc = (int(filtered_kp[i].pt[0]), int(filtered_kp[i].pt[1]))
-            result = detect_tampering_by_coords(img_cv, [loc], ref_wm)
-            if not result:  # if no tampering at that location, assume watermark exists
-                detected += 1
-            if detected >= required:
-                return "Yes"
-
-        return "No"
-    except Exception as e:
-        print("Verification failed:", str(e))
-        return "No"
 
 # ==== Button Callbacks ====
 carrier_btn.config(command=load_carrier)
