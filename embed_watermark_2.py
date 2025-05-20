@@ -3,6 +3,8 @@ import numpy as np
 
 def embed_watermark(img, keypoints, watermark_path, keypoint_index=0):
     watermark = cv2.imread(watermark_path, cv2.IMREAD_GRAYSCALE)
+
+    # binarised watermark
     wm_bits = (watermark > 128).astype(np.uint8)
 
     kp = keypoints[keypoint_index]
@@ -13,18 +15,19 @@ def embed_watermark(img, keypoints, watermark_path, keypoint_index=0):
 
     region = img[y-1:y+2, x-1:x+2].copy()
 
-    # print("Original 3x3 RGB values (before embedding):")
+    # print("Original 3x3 RGB values (before):")
     # for i in range(3):
     #     for j in range(3):
     #         print(f"({i},{j}): BGR = {region[i, j].tolist()}")
 
+    # embed watermark into the blue channel
     for i in range(3):
         for j in range(3):
             blue_val = region[i, j, 0]
             blue_val = (blue_val & 0xFE) | wm_bits[i, j]
             region[i, j, 0] = blue_val
 
-    # print("\nModified 3x3 RGB values (after embedding):")
+    # print("\nWatermark Embedded 3x3 RGB values (after):")
     # for i in range(3):
     #     for j in range(3):
     #         print(f"({i},{j}): BGR = {region[i, j].tolist()}")
