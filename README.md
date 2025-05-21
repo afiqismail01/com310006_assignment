@@ -1,4 +1,4 @@
-# Image Steganography GUI (COM310006 - Computer Vision Assignment)
+# Image Steganography GUI (COM31006 - Computer Vision Assignment)
 
 This assignment developed an image steganography visualisation tool for embedding a carrier image with watermarks. The tool primarily use SIFT algorithm to detect keypoints and modify the image bit values using Least Significant Bit (LSB). 
 Designed as part of the COM310006 assignment.
