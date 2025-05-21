@@ -34,10 +34,10 @@ Open project in PyCharm (preferred) with `Python3.13`, setup virtual environment
 
   ```bash
   # Create a new virtual environment in a folder called "venv"
-  python -m venv venv
+  python -m venv .venv
   
   # Activate the virtual environment (Windows)
-  .\venv\Scripts\activate
+  .\.venv\Scripts\activate
   
   # Install required packages
   pip install numpy opencv-python pillow
