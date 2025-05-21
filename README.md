@@ -32,15 +32,22 @@ git clone https://github.com/afiqismail01/com310006_assignment.git
 2. **Setup Project Environment:**
 Open project in PyCharm (preferred), setup virtual environment & install necessary modules in the package.
 
-2. **Run GUI Simulation:**
+2. **Sample Carrier Image & Watermarks :**
+    - CARRIER IMAGE: carrier_image.png
+    - WATERMARK: watermark_1.png, watermark_2.png & watermark_3.png
+    - EMBEDDED IMAGE: watermarked_output.png
+    - TAMPERED IMAGE: watermarked_rotated_output.png & watermarked_cropped_image.png (need to be generated using buttons in Frame 6 GUI)
+    - TEST IMAGE: use any image from your local device to perform testing
+3. **Run GUI Simulation:**
 Find a file named `stagenography_gui.py` in the package and run the file. `(CTRL+SHIFT+F10)`
 
     ![image](https://github.com/user-attachments/assets/19c6388c-43fe-48e2-9a8a-a286944af6df)
 
 Simulation Video can be found here: https://youtu.be/uZoSPnXC4oc
 
-## Helper Functions:
+## Helper Functions & Extras:
 
 1. A 3x3 binary watermark image generator can be found in the utils  `watermark_generator.py`. Simply hardcode the values in the matrix with either `0` or `255`  and run the program. `(CTRL+SHIFT+F10)`
     
     ![image](https://github.com/user-attachments/assets/6bea3ac4-b11a-4553-a944-b3302aae350c)
+
